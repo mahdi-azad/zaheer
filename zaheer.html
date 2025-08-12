@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>4‑7‑8 Breath Meditation Timer</title>
+  <style>
+    :root {
+      --bg1: #0f172a; /* slate-900 */
+      --bg2: #111827; /* gray-900 */
+      --accent: #22d3ee; /* cyan-400 */
+      --accent-2: #a78bfa; /* violet-400 */
+      --text: #e5e7eb; /* gray-200 */
+      --muted: #94a3b8; /* slate-400 */
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 70% -20%, #0b1022 0%, var(--bg1) 50%, var(--bg2) 100%);
+    }
+
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      align-items: center;
+      justify-items: center;
+      gap: 1.25rem;
+      padding: 1.25rem;
+    }
+
+    header { text-align: center; }
+
+    h1 {
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      margin: 0.2rem 0 0.4rem;
+      font-size: clamp(1.25rem, 1rem + 1.5vw, 2rem);
+    }
+
+    .subtitle { color: var(--muted); font-size: 0.95rem; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+      align-items: center;
+      margin-top: 0.25rem;
+    }
+
+    .btn, .pill {
+      border: 1px solid rgba(255,255,255,0.15);
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+      color: var(--text);
+      padding: 0.6rem 0.9rem;
+      border-radius: 999px;
+      cursor: pointer;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 0 0 0 rgba(34, 211, 238, 0);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:hover, .pill:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+    .btn:active, .pill:active { transform: translateY(0); }
+    .btn[disabled] { opacity: .6; cursor: not-allowed; }
+
+    .pill.active {
+      border-color: rgba(34, 211, 238, .7);
+      box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.1);
+    }
+
+    .timer-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      place-items: center;
+      width: min(92vw, 560px);
+      margin-inline: auto;
+      gap: 1rem;
+    }
+
+    /* Breath Orb */
+    .orb-wrap {
+      position: relative;
+      width: min(80vw, 420px);
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+    }
+
+    .orb {
+      width: 72%;
+      aspect-ratio: 1 / 1;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(60% 60% at 40% 35%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.08) 60%, rgba(255,255,255,0.04) 100%),
+                  conic-gradient(from 0deg, rgba(167,139,250,0.35), rgba(34,211,238,0.35), rgba(167,139,250,0.35));
+      box-shadow:
+        inset 0 0 40px rgba(167,139,250,0.25),
+        0 24px 60px rgba(0,0,0,0.55),
+        0 0 140px 30px rgba(34,211,238,0.08);
+      transition: transform var(--phase-ms, 400ms) ease-in-out, filter .6s ease;
+      transform: scale(var(--scale, 0.9));
+      will-change: transform;
+    }
+
+    .orb::after { /* subtle breathing glow */
+      content: "";
+      position: absolute;
+      inset: -12%;
+      border-radius: 50%;
+      background: radial-gradient(60% 60% at 50% 40%, rgba(34,211,238,0.18), rgba(167,139,250,0.12), transparent 70%);
+      filter: blur(24px);
+      z-index: -1;
+      pointer-events: none;
+      transition: opacity var(--phase-ms, 400ms) ease-in-out;
+      opacity: var(--glow, 0.6);
+    }
+
+    .phase-label {
+      text-align: center;
+      font-weight: 600;
+      letter-spacing: .4px;
+      font-size: clamp(1.05rem, 0.6rem + 1.2vw, 1.2rem);
+      color: #e6f9ff;
+      text-shadow: 0 2px 12px rgba(34,211,238,0.35);
+    }
+
+    .phase-seconds {
+      font-variant-numeric: tabular-nums;
+      margin-top: 0.25rem;
+      font-size: clamp(2.2rem, 1.4rem + 3vw, 3rem);
+      font-weight: 800;
+    }
+
+    /* Progress ring for total time */
+    .ring { position: absolute; inset: 0; display: grid; place-items: center; }
+    svg { display: block; width: 100%; height: 100%; }
+    .ring-bg { stroke: rgba(255,255,255,0.08); }
+    .ring-fg { stroke: url(#grad); filter: drop-shadow(0 0 10px rgba(34,211,238,0.35)); transition: stroke-dashoffset .25s linear; }
+
+    .meta {
+      display: grid;
+      place-items: center;
+      gap: .2rem;
+      margin-top: .2rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .big { font-size: 1.05rem; color: #f8fafc; }
+
+    footer { opacity: .7; font-size: .85rem; text-align: center; margin-top: .5rem; }
+    a { color: #67e8f9; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>4‑7‑8 Breath Meditation</h1>
+      <div class="subtitle">Inhale 4 • Hold 7 • Exhale 8 — guided by the orb</div>
+      <div class="controls" role="group" aria-label="Session length">
+        <button class="pill active" data-minutes="20" id="opt20" aria-pressed="true">20 minutes</button>
+        <button class="pill" data-minutes="10" id="opt10" aria-pressed="false">10 minutes</button>
+        <button class="btn" id="start">Start</button>
+        <button class="btn" id="pause" disabled>Pause</button>
+        <button class="btn" id="reset" disabled>Reset</button>
+      </div>
+    </header>
+
+    <main class="timer-grid">
+      <div class="orb-wrap" aria-live="polite">
+        <div class="ring" aria-hidden="true">
+          <svg viewBox="0 0 220 220">
+            <defs>
+              <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#22d3ee"/>
+                <stop offset="100%" stop-color="#a78bfa"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-bg" cx="110" cy="110" r="100" fill="none" stroke-width="10" />
+            <circle id="ringFg" class="ring-fg" cx="110" cy="110" r="100" fill="none" stroke-width="10"
+                    stroke-dasharray="628.318" stroke-dashoffset="0" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div id="orb" class="orb">
+          <div class="phase">
+            <div id="phaseLabel" class="phase-label">Ready</div>
+            <div id="phaseSeconds" class="phase-seconds">00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meta" id="meta">
+        <div><span class="big" id="totalLeft">20:00</span> remaining • cycle <span id="cycleNum">0</span></div>
+        <div>Tip: keep the orb smooth and quiet — inhale through the nose, exhale softly through the mouth.</div>
+      </div>
+    </main>
+
+    <footer>
+      4‑7‑8 pattern length: 19 seconds per cycle • Designed for calm, not medical treatment.
+    </footer>
+  </div>
+
+  <script>
+    (() => {
+      const DUR = { inhale: 4, hold: 7, exhale: 8 };
+      const CYCLE = DUR.inhale + DUR.hold + DUR.exhale; // 19s
+
+      // UI elements
+      const orb = document.getElementById('orb');
+      const label = document.getElementById('phaseLabel');
+      const secs = document.getElementById('phaseSeconds');
+      const totalLeftEl = document.getElementById('totalLeft');
+      const cycleNumEl = document.getElementById('cycleNum');
+      const startBtn = document.getElementById('start');
+      const pauseBtn = document.getElementById('pause');
+      const resetBtn = document.getElementById('reset');
+      const opt20 = document.getElementById('opt20');
+      const opt10 = document.getElementById('opt10');
+      const ringFg = document.getElementById('ringFg');
+
+      // State
+      let minutes = 20;
+      let totalMs = minutes * 60 * 1000;
+      let startTs = null;        // timestamp when started/resumed
+      let elapsedMs = 0;         // accumulated when paused
+      let rafId = null;          // requestAnimationFrame id
+      let running = false;
+
+      function setDuration(min) {
+        minutes = min;
+        totalMs = minutes * 60 * 1000;
+        elapsedMs = 0;
+        updateUI(0);
+        setActivePill(min === 20 ? opt20 : opt10);
+      }
+
+      function setActivePill(el) {
+        for (const pill of [opt20, opt10]) {
+          pill.classList.toggle('active', pill === el);
+          pill.setAttribute('aria-pressed', pill === el ? 'true' : 'false');
+        }
+      }
+
+      function fmt(ms) {
+        const s = Math.max(0, Math.ceil(ms / 1000));
+        const mPart = Math.floor(s / 60);
+        const sPart = s % 60;
+        return `${mPart}:${sPart.toString().padStart(2,'0')}`;
+      }
+
+      function phaseAt(t) {
+        // t in seconds within cycle
+        if (t < DUR.inhale) return ['Inhale', DUR.inhale - t, t / DUR.inhale, 'inhale'];
+        if (t < DUR.inhale + DUR.hold) {
+          const intoHold = t - DUR.inhale;
+          return ['Hold', DUR.hold - intoHold, intoHold / DUR.hold, 'hold'];
+        }
+        const intoExhale = t - DUR.inhale - DUR.hold;
+        return ['Exhale', DUR.exhale - intoExhale, intoExhale / DUR.exhale, 'exhale'];
+      }
+
+      function applyOrbVisual(phase, progress) {
+        // progress 0..1 within phase
+        let scale;
+        let glow;
+        if (phase === 'inhale') {
+          scale = 0.85 + 0.20 * progress; // grow
+          glow = 0.55 + 0.25 * progress;
+        } else if (phase === 'hold') {
+          scale = 1.05; // steady
+          glow = 0.85;
+        } else {
+          scale = 1.05 - 0.25 * progress; // shrink
+          glow = 0.85 - 0.35 * progress;
+        }
+        const ms = 1000 / 30; // smooth CSS transition step hint
+        orb.style.setProperty('--scale', scale.toFixed(3));
+        orb.style.setProperty('--glow', glow.toFixed(3));
+        orb.style.setProperty('--phase-ms', ms + 'ms');
+      }
+
+      function updateUI(nowMs) {
+        const elapsed = nowMs;
+        const remaining = Math.max(0, totalMs - elapsed);
+
+        // total timer UI
+        totalLeftEl.textContent = fmt(remaining);
+        const cycles = Math.floor((elapsed / 1000) / CYCLE);
+        cycleNumEl.textContent = cycles;
+
+        // progress ring
+        const CIRC = 2 * Math.PI * 100; // r=100
+        const pct = Math.min(1, elapsed / totalMs);
+        ringFg.style.strokeDashoffset = String(CIRC * (1 - pct));
+
+        // phase UI
+        const tInCycle = ((elapsed / 1000) % CYCLE + CYCLE) % CYCLE; // seconds 0..19
+        const [name, secsLeft, progress, key] = phaseAt(tInCycle);
+        label.textContent = name;
+        secs.textContent = Math.ceil(secsLeft).toString().padStart(2,'0');
+        applyOrbVisual(key, progress);
+      }
+
+      function tick(ts) {
+        if (!running) return; // stop if paused
+        if (!startTs) startTs = ts;
+        const nowElapsed = elapsedMs + (ts - startTs);
+        updateUI(nowElapsed);
+        if (nowElapsed >= totalMs) {
+          stopRunning(true);
+          return;
+        }
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function start() {
+        if (running) return;
+        running = true;
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        resetBtn.disabled = false;
+        startTs = null;
+        rafId = requestAnimationFrame(tick);
+      }
+
+      function pause() {
+        if (!running) return;
+        running = false;
+        pauseBtn.disabled = true;
+        startBtn.disabled = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        // lock in elapsed so far
+        const t = performance.now();
+        if (startTs) elapsedMs += (t - startTs);
+        startTs = null;
+      }
+
+      function stopRunning(finished = false) {
+        running = false;
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        startTs = null;
+        elapsedMs = finished ? totalMs : elapsedMs;
+        updateUI(elapsedMs);
+        startBtn.disabled = finished; // prevent restart if finished
+        pauseBtn.disabled = true;
+        resetBtn.disabled = false;
+      }
+
+      function reset() {
+        stopRunning(false);
+        elapsedMs = 0;
+        updateUI(0);
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        resetBtn.disabled = true;
+      }
+
+      // Wire controls
+      opt20.addEventListener('click', () => { if (!running) setDuration(20); });
+      opt10.addEventListener('click', () => { if (!running) setDuration(10); });
+      startBtn.addEventListener('click', start);
+      pauseBtn.addEventListener('click', pause);
+      resetBtn.addEventListener('click', reset);
+
+      // Keyboard shortcuts for power users
+      window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space') { e.preventDefault(); running ? pause() : start(); }
+        if (e.key === 'r' || e.key === 'R') { reset(); }
+        if ((e.key === '1') && !running) setDuration(10);
+        if ((e.key === '2') && !running) setDuration(20);
+      });
+
+      // Initialize
+      setDuration(20);
+      updateUI(0);
+    })();
+  </script>
+</body>
+</html>
